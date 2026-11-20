@@ -1,0 +1,333 @@
+---
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const b = `${base}bake/`;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bake Log</title>
+  <meta name="theme-color" content="#b5651d" />
+  <meta name="robots" content="noindex" />
+  <link rel="manifest" href={`${b}manifest.webmanifest`} />
+  <link rel="icon" type="image/svg+xml" href={`${b}icon.svg`} />
+  <link rel="apple-touch-icon" href={`${b}apple-touch-icon.png`} />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Bake Log" />
+  <style is:global>
+    :root {
+      --bg: #faf5ec; --card: #fffdf8; --ink: #2b2118; --mute: #7a6a58; --line: #e6dac6;
+      --accent: #b5651d; --accent-ink: #fff; --good: #3d7a4a; --danger: #b3382c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1b1611; --card: #251e17; --ink: #f3e9da; --mute: #a8957e; --line: #3a2f24; --accent: #d98a43; --accent-ink: #1b1611; }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+    header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(12px + env(safe-area-inset-top)) 16px 10px; border-bottom: 1px solid var(--line); }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+    .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    input, select, textarea { width: 100%; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    textarea { min-height: 76px; resize: vertical; }
+    label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); margin: 12px 0 4px; }
+    main { padding: 12px 16px; max-width: 640px; margin: 0 auto; }
+    .search { margin-top: 8px; }
+    .card { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; margin-bottom: 10px; width: 100%; text-align: left; color: inherit; font: inherit; }
+    .thumb { flex: none; width: 72px; height: 72px; border-radius: 10px; background: var(--line) center/cover; display: grid; place-items: center; font-size: 30px; }
+    .card h3 { margin: 0; font-size: 16px; }
+    .meta { color: var(--mute); font-size: 13px; }
+    .stars { color: var(--accent); letter-spacing: 2px; }
+    .empty { text-align: center; color: var(--mute); padding: 48px 16px; }
+    .fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 16px 22px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px; text-align: center; }
+    .stat b { display: block; font-size: 20px; }
+    .stat span { font-size: 11px; color: var(--mute); }
+    /* editor sheet */
+    dialog { border: 0; padding: 0; width: 100%; max-width: 640px; height: 100%; max-height: 100%; margin: 0 auto; background: var(--bg); color: var(--ink); }
+    dialog::backdrop { background: rgba(0,0,0,.5); }
+    .sheet { padding: calc(12px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .sheet-head h2 { margin: 0; font-size: 20px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .calc { background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; margin-top: 10px; font-size: 14px; color: var(--mute); }
+    .calc b { color: var(--ink); }
+    h4 { margin: 22px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    .starpick { display: flex; gap: 4px; }
+    .starpick button { background: none; border: 0; font-size: 34px; color: var(--line); padding: 0 2px; }
+    .starpick button.on { color: var(--accent); }
+    .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 12px 16px; font: inherit; }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+    .btn.danger { color: var(--danger); }
+    .actions { display: flex; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
+    .actions .btn { flex: 1; }
+    .photo { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; margin-top: 8px; display: block; }
+    .menu { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .menu .btn { flex: 1; font-size: 14px; }
+    .hint { color: var(--mute); font-size: 13px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🍞 Bake Log</h1>
+    <div class="chips" id="filters"></div>
+    <input class="search" id="search" type="search" placeholder="Search bakes & notes…" />
+  </header>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div id="list"></div>
+    <div class="menu">
+      <button class="btn" id="export">Export backup</button>
+      <button class="btn" id="import">Import backup</button>
+      <input type="file" id="importFile" accept="application/json" hidden />
+    </div>
+    <p class="hint">Saved on this device only. Use Export now and then to back up or move to a new phone.</p>
+  </main>
+  <button class="fab" id="add">+ New bake</button>
+
+  <dialog id="editor">
+    <form class="sheet" id="form" method="dialog">
+      <div class="sheet-head">
+        <h2 id="editorTitle">New bake</h2>
+        <button type="button" class="btn" id="close">Close</button>
+      </div>
+
+      <h4>Basics</h4>
+      <div class="grid2">
+        <div><label for="f-date">Date</label><input id="f-date" type="date" required /></div>
+        <div><label for="f-type">Type</label>
+          <select id="f-type"><option>Sourdough</option><option>Pizza</option><option>Other</option></select></div>
+      </div>
+      <label for="f-name">Name / recipe</label>
+      <input id="f-name" placeholder="e.g. 75% hydration country loaf" required />
+
+      <h4>Recipe</h4>
+      <div class="grid3">
+        <div><label for="f-flour">Flour (g)</label><input id="f-flour" type="number" inputmode="decimal" /></div>
+        <div><label for="f-water">Water (g)</label><input id="f-water" type="number" inputmode="decimal" /></div>
+        <div><label for="f-salt">Salt (g)</label><input id="f-salt" type="number" inputmode="decimal" step="0.1" /></div>
+      </div>
+      <div class="grid2">
+        <div><label for="f-leaven" id="leavenLabel">Starter (g)</label><input id="f-leaven" type="number" inputmode="decimal" step="0.1" /></div>
+        <div><label for="f-flourtype">Flour type</label><input id="f-flourtype" placeholder="e.g. 80% bread / 20% WW" /></div>
+      </div>
+      <div class="calc" id="calc">Enter flour & water to see baker's percentages.</div>
+      <label for="f-extras">Other ingredients</label>
+      <input id="f-extras" placeholder="e.g. olive oil 10g, honey, seeds" />
+
+      <h4>Process</h4>
+      <div class="grid2">
+        <div><label for="f-bulk">Bulk / first rise (hrs)</label><input id="f-bulk" type="number" inputmode="decimal" step="0.25" /></div>
+        <div><label for="f-proof">Final proof (hrs)</label><input id="f-proof" type="number" inputmode="decimal" step="0.25" /></div>
+      </div>
+      <div class="grid3">
+        <div><label for="f-temp">Oven °F</label><input id="f-temp" type="number" inputmode="numeric" /></div>
+        <div><label for="f-baketime">Bake (min)</label><input id="f-baketime" type="number" inputmode="numeric" /></div>
+        <div><label for="f-room">Room °F</label><input id="f-room" type="number" inputmode="numeric" /></div>
+      </div>
+      <label for="f-method">Method notes</label>
+      <textarea id="f-method" placeholder="Folds, shaping, cold retard, Dutch oven vs. steel/stone…"></textarea>
+
+      <h4>Result</h4>
+      <label>Rating</label>
+      <div class="starpick" id="stars"></div>
+      <label for="f-result">How did it turn out?</label>
+      <textarea id="f-result" placeholder="Crumb, crust, flavor, oven spring, leopard spots…"></textarea>
+      <label for="f-next">Change next time</label>
+      <textarea id="f-next" placeholder="More water? Longer proof? Hotter oven?"></textarea>
+      <label>Photo</label>
+      <input id="f-photo" type="file" accept="image/*" />
+      <img id="photoPrev" class="photo" alt="" hidden />
+      <button type="button" class="btn" id="photoClear" hidden style="margin-top:8px">Remove photo</button>
+
+      <div class="actions">
+        <button type="submit" class="btn primary" id="save">Save</button>
+        <button type="button" class="btn" id="again" hidden>Bake again</button>
+        <button type="button" class="btn danger" id="del" hidden>Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script is:inline>
+    (function () {
+      const KEY = 'bakelog.v1';
+      const $ = (id) => document.getElementById(id);
+      const FIELDS = ['date','type','name','flour','water','salt','leaven','flourtype','extras','bulk','proof','temp','baketime','room','method','result','next'];
+      let bakes = [];
+      try { bakes = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { bakes = []; }
+      let filter = 'All', query = '', current = null, rating = 0, photo = '';
+
+      const persist = () => {
+        try { localStorage.setItem(KEY, JSON.stringify(bakes)); }
+        catch (e) { alert('Could not save — storage may be full. Export a backup and remove some photos.'); }
+      };
+      const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+      const pct = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
+      const emoji = (t) => (t === 'Pizza' ? '🍕' : t === 'Sourdough' ? '🍞' : '🥖');
+      const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+      const fmtDate = (d) => { try { return new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return d; } };
+
+      /* ---------- list ---------- */
+      function renderFilters() {
+        $('filters').innerHTML = ['All', 'Sourdough', 'Pizza', 'Other'].map((t) =>
+          `<button class="chip ${t === filter ? 'on' : ''}" data-f="${t}">${t}</button>`).join('');
+      }
+      function visible() {
+        const q = query.trim().toLowerCase();
+        return bakes
+          .filter((b) => filter === 'All' || b.type === filter)
+          .filter((b) => !q || [b.name, b.method, b.result, b.next, b.extras, b.flourtype].join(' ').toLowerCase().includes(q))
+          .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.created || 0) - (a.created || 0));
+      }
+      function render() {
+        renderFilters();
+        const rated = bakes.filter((b) => b.rating);
+        const avg = rated.length ? (rated.reduce((s, b) => s + b.rating, 0) / rated.length).toFixed(1) : '–';
+        const best = rated.length ? Math.max(...rated.map((b) => b.rating)) : '–';
+        $('stats').innerHTML =
+          `<div class="stat"><b>${bakes.length}</b><span>Bakes</span></div>` +
+          `<div class="stat"><b>${avg}</b><span>Avg rating</span></div>` +
+          `<div class="stat"><b>${best}</b><span>Best</span></div>`;
+        const list = visible();
+        $('list').innerHTML = list.length ? list.map((b) => {
+          const hyd = pct(num(b.water), num(b.flour));
+          const bits = [fmtDate(b.date), b.type, hyd != null ? hyd + '% hyd' : '', b.temp ? b.temp + '°F' : ''].filter(Boolean).join(' · ');
+          return `<button class="card" data-id="${b.id}">
+            <div class="thumb" style="${b.photo ? `background-image:url(${b.photo})` : ''}">${b.photo ? '' : emoji(b.type)}</div>
+            <div><h3>${esc(b.name)}</h3><div class="meta">${esc(bits)}</div>
+            ${b.rating ? `<div class="stars">${stars(b.rating)}</div>` : ''}
+            ${b.result ? `<div class="meta">${esc(b.result.slice(0, 80))}${b.result.length > 80 ? '…' : ''}</div>` : ''}</div></button>`;
+        }).join('') : `<div class="empty">${bakes.length ? 'No bakes match.' : 'No bakes yet.<br>Tap “+ New bake” after your next loaf or pizza.'}</div>`;
+      }
+
+      /* ---------- editor ---------- */
+      function renderStars() {
+        $('stars').innerHTML = [1, 2, 3, 4, 5].map((n) =>
+          `<button type="button" class="${n <= rating ? 'on' : ''}" data-n="${n}" aria-label="${n} stars">★</button>`).join('');
+      }
+      function updateCalc() {
+        const flour = num($('f-flour').value), water = num($('f-water').value), salt = num($('f-salt').value), l = num($('f-leaven').value);
+        const t = $('f-type').value;
+        if (!flour) { $('calc').innerHTML = 'Enter flour & water to see baker\'s percentages.'; return; }
+        const parts = [];
+        if (water) parts.push(`Hydration <b>${pct(water, flour)}%</b>`);
+        if (salt) parts.push(`Salt <b>${pct(salt, flour)}%</b>`);
+        if (l) parts.push(`${t === 'Sourdough' ? 'Starter' : 'Yeast'} <b>${pct(l, flour)}%</b>`);
+        parts.push(`Total dough <b>${Math.round(flour + water + salt + l)} g</b>`);
+        $('calc').innerHTML = parts.join(' · ');
+      }
+      function updateLabels() { $('leavenLabel').textContent = $('f-type').value === 'Sourdough' ? 'Starter (g)' : 'Yeast (g)'; }
+      function setPhoto(src) {
+        photo = src || '';
+        $('photoPrev').hidden = !photo; $('photoClear').hidden = !photo;
+        if (photo) $('photoPrev').src = photo;
+      }
+      function openEditor(bake, isNew) {
+        current = isNew ? null : bake;
+        const b = bake || {};
+        $('editorTitle').textContent = isNew ? 'New bake' : 'Edit bake';
+        FIELDS.forEach((k) => { $('f-' + k).value = b[k] ?? ''; });
+        if (!$('f-date').value) $('f-date').value = today();
+        if (!$('f-type').value) $('f-type').value = 'Sourdough';
+        rating = b.rating || 0; renderStars(); setPhoto(b.photo); $('f-photo').value = '';
+        $('again').hidden = $('del').hidden = isNew;
+        updateLabels(); updateCalc();
+        $('editor').showModal(); $('editor').scrollTop = 0;
+      }
+      function readForm() {
+        const o = {};
+        FIELDS.forEach((k) => { o[k] = $('f-' + k).value.trim(); });
+        o.rating = rating; o.photo = photo;
+        return o;
+      }
+
+      // shrink photos so localStorage doesn't fill up
+      function resize(file) {
+        return new Promise((res) => {
+          const img = new Image(), url = URL.createObjectURL(file);
+          img.onload = () => {
+            const max = 900, s = Math.min(1, max / Math.max(img.width, img.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.72));
+          };
+          img.onerror = () => res('');
+          img.src = url;
+        });
+      }
+
+      /* ---------- events ---------- */
+      $('filters').addEventListener('click', (e) => { const f = e.target.dataset.f; if (f) { filter = f; render(); } });
+      $('search').addEventListener('input', (e) => { query = e.target.value; render(); });
+      $('list').addEventListener('click', (e) => {
+        const c = e.target.closest('.card'); if (!c) return;
+        openEditor(bakes.find((b) => b.id === c.dataset.id), false);
+      });
+      $('add').addEventListener('click', () => openEditor(null, true));
+      $('close').addEventListener('click', () => $('editor').close());
+      $('stars').addEventListener('click', (e) => {
+        const n = +e.target.dataset.n; if (!n) return;
+        rating = rating === n ? 0 : n; renderStars();
+      });
+      ['flour','water','salt','leaven','type'].forEach((k) => $('f-' + k).addEventListener('input', () => { updateLabels(); updateCalc(); }));
+      $('f-photo').addEventListener('change', async (e) => { const f = e.target.files[0]; if (f) setPhoto(await resize(f)); });
+      $('photoClear').addEventListener('click', () => { setPhoto(''); $('f-photo').value = ''; });
+
+      $('form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const data = readForm();
+        if (current) Object.assign(current, data);
+        else bakes.push({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), created: Date.now(), ...data });
+        persist(); render(); $('editor').close();
+      });
+      // Copy a past bake as the starting point for a new one (keeps recipe, clears results)
+      $('again').addEventListener('click', () => {
+        const d = readForm();
+        d.date = today(); d.rating = 0; d.result = ''; d.photo = '';
+        $("editor").close();
+        openEditor(d, true);
+        $('f-next').value = '';
+        if (d.next) $('f-method').value = (d.method ? d.method + '\n\n' : '') + 'Tweak planned: ' + d.next;
+      });
+      $('del').addEventListener('click', () => {
+        if (!current || !confirm('Delete this bake?')) return;
+        bakes = bakes.filter((b) => b !== current); persist(); render(); $('editor').close();
+      });
+
+      /* ---------- backup ---------- */
+      $('export').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(bakes, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = `bake-log-${today()}.json`; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      });
+      $('import').addEventListener('click', () => $('importFile').click());
+      $('importFile').addEventListener('change', async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+          const arr = JSON.parse(await f.text());
+          if (!Array.isArray(arr)) throw 0;
+          const have = new Set(bakes.map((b) => b.id));
+          const fresh = arr.filter((b) => b && b.id && b.name && !have.has(b.id));
+          bakes = bakes.concat(fresh); persist(); render();
+          alert(`Imported ${fresh.length} bake(s).`);
+        } catch (err) { alert('That file is not a valid Bake Log backup.'); }
+        e.target.value = '';
+      });
+
+      render();
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    })();
+  </script>
+</body>
+</html>
