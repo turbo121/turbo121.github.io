@@ -71,12 +71,18 @@ const b = `${base}bake/`;
     .photo { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; margin-top: 8px; display: block; }
     .menu { margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; }
     .menu .btn { flex: 1; font-size: 14px; }
+    .ing { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-top: 10px; }
+    .ing .top { display: grid; grid-template-columns: 1fr 1fr 40px; gap: 8px; }
+    .ing .bot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .ing label { margin: 0 0 2px; font-size: 11px; }
+    .ing .x { background: none; border: 1px solid var(--line); border-radius: 10px; color: var(--danger); font-size: 18px; }
+    .ing input[readonly] { color: var(--mute); background: transparent; }
     .hint { color: var(--mute); font-size: 13px; margin-top: 16px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>🍞 Bake Log</h1>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><h1 style="margin:0">🍞 Bake Log</h1><button class="btn" id="openCalc" style="padding:8px 12px">% Calculator</button></div>
     <div class="chips" id="filters"></div>
     <input class="search" id="search" type="search" placeholder="Search bakes & notes…" />
   </header>
@@ -153,6 +159,28 @@ const b = `${base}bake/`;
         <button type="button" class="btn danger" id="del" hidden>Delete</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="calcDlg">
+    <div class="sheet">
+      <div class="sheet-head"><h2>Baker's % calculator</h2><button type="button" class="btn" id="calcClose">Close</button></div>
+      <div class="chips" style="margin-top:8px">
+        <button class="chip" data-preset="sourdough">Sourdough loaf</button>
+        <button class="chip" data-preset="pizza">Pizza dough</button>
+        <button class="chip" data-preset="blank">Blank</button>
+      </div>
+      <div id="calcRows"></div>
+      <button type="button" class="btn" id="calcAdd" style="width:100%;margin-top:10px">+ Add ingredient</button>
+      <div class="calc" id="calcSum"></div>
+      <div id="shWrap" hidden>
+        <label for="calcSH">Starter hydration (%)</label>
+        <input id="calcSH" type="number" inputmode="decimal" />
+      </div>
+      <label for="calcTarget">Scale recipe to total dough (g)</label>
+      <div class="row"><input id="calcTarget" type="number" inputmode="decimal" placeholder="e.g. 1000" /><button type="button" class="btn" id="calcScale">Scale</button></div>
+      <div class="actions"><button type="button" class="btn primary" id="calcUse">Use in a new bake</button></div>
+      <p class="hint">Percentages are relative to total flour (all flours = 100%). Edit grams to see percentages, or edit a percentage to get grams. “True hydration” also counts the flour and water inside your starter.</p>
+    </div>
   </dialog>
 
   <script is:inline>
@@ -323,6 +351,107 @@ const b = `${base}bake/`;
           alert(`Imported ${fresh.length} bake(s).`);
         } catch (err) { alert('That file is not a valid Bake Log backup.'); }
         e.target.value = '';
+      });
+
+      /* ---------- baker's % calculator ---------- */
+      const CKEY = 'bakelog.calc';
+      const KINDS = [['flour','Flour'],['liquid','Water / liquid'],['salt','Salt'],['starter','Sourdough starter'],['yeast','Yeast'],['other','Other']];
+      const PRESETS = {
+        sourdough: [['Bread flour','flour',900],['Whole wheat flour','flour',100],['Water','liquid',750],['Starter','starter',200],['Salt','salt',20]],
+        pizza: [['00 flour','flour',1000],['Water','liquid',650],['Salt','salt',25],['Instant yeast','yeast',2]],
+        blank: [['Flour','flour',''],['Water','liquid',''],['Salt','salt','']],
+      };
+      const mk = (a) => a.map(([name, kind, g]) => ({ name, kind, g }));
+      let calc = null;
+      try { calc = JSON.parse(localStorage.getItem(CKEY)); } catch (e) {}
+      if (!calc || !Array.isArray(calc.rows)) calc = { rows: mk(PRESETS.sourdough), sh: 100 };
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const r1 = (x) => Math.round(x * 10) / 10;
+      const sumK = (k) => calc.rows.filter((r) => r.kind === k).reduce((t, r) => t + num(r.g), 0);
+      const cGrams = (r) => (r.g === '' || r.g == null ? '' : String(r2(num(r.g))));
+      const cPct = (r) => { const F = sumK('flour'); return F > 0 && r.g !== '' ? String(r1(num(r.g) / F * 100)) : ''; };
+
+      function calcRows() {
+        $('calcRows').innerHTML = calc.rows.map((r, i) => `
+          <div class="ing" data-i="${i}">
+            <div class="top">
+              <div><label>Ingredient</label><input class="c-name" value="${esc(r.name)}" /></div>
+              <div><label>Type</label><select class="c-kind">${KINDS.map(([k, l]) => `<option value="${k}" ${k === r.kind ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+              <div style="align-self:end"><button type="button" class="x" aria-label="Remove">×</button></div>
+            </div>
+            <div class="bot">
+              <div><label>Grams</label><input class="c-g" type="number" inputmode="decimal" step="any" value="${cGrams(r)}" /></div>
+              <div><label>${r.kind === 'flour' ? '% of flour (share)' : 'Baker\'s %'}</label><input class="c-p" type="number" inputmode="decimal" step="any" value="${cPct(r)}" ${r.kind === 'flour' ? 'readonly' : ''} /></div>
+            </div>
+          </div>`).join('');
+        calcRefresh();
+      }
+      function calcRefresh() {
+        const act = document.activeElement;
+        document.querySelectorAll('#calcRows .ing').forEach((el) => {
+          const r = calc.rows[+el.dataset.i], g = el.querySelector('.c-g'), p = el.querySelector('.c-p');
+          if (g !== act) g.value = cGrams(r);
+          if (p !== act) p.value = cPct(r);
+        });
+        const F = sumK('flour'), L = sumK('liquid'), S = sumK('starter');
+        const total = calc.rows.reduce((t, r) => t + num(r.g), 0);
+        const parts = [`Total dough <b>${r1(total)} g</b>`, `Flour <b>${r1(F)} g</b>`];
+        if (F > 0) {
+          parts.push(`Hydration <b>${r1(L / F * 100)}%</b>`);
+          if (S > 0) {
+            const h = num(calc.sh) / 100, sf = S / (1 + h), sw = S - sf;
+            parts.push(`True hydration <b>${r1((L + sw) / (F + sf) * 100)}%</b>`);
+          }
+        }
+        $('calcSum').innerHTML = parts.join(' · ');
+        $('shWrap').hidden = S <= 0;
+        if (document.activeElement !== $('calcSH')) $('calcSH').value = calc.sh;
+        try { localStorage.setItem(CKEY, JSON.stringify(calc)); } catch (e) {}
+      }
+
+      $('openCalc').addEventListener('click', () => { calcRows(); $('calcDlg').showModal(); $('calcDlg').scrollTop = 0; });
+      $('calcClose').addEventListener('click', () => $('calcDlg').close());
+      $('calcDlg').addEventListener('click', (e) => {
+        const pr = e.target.dataset && e.target.dataset.preset;
+        if (pr) { calc.rows = mk(PRESETS[pr]); calcRows(); }
+      });
+      $('calcAdd').addEventListener('click', () => { calc.rows.push({ name: '', kind: 'other', g: '' }); calcRows(); });
+      $('calcRows').addEventListener('input', (e) => {
+        const el = e.target.closest('.ing'); if (!el) return;
+        const r = calc.rows[+el.dataset.i], c = e.target.classList;
+        if (c.contains('c-name')) r.name = e.target.value;
+        else if (c.contains('c-g')) r.g = e.target.value === '' ? '' : num(e.target.value);
+        else if (c.contains('c-p')) { const F = sumK('flour'); if (F > 0) r.g = e.target.value === '' ? '' : r2(num(e.target.value) * F / 100); }
+        calcRefresh();
+      });
+      $('calcRows').addEventListener('change', (e) => {
+        const el = e.target.closest('.ing'); if (!el || !e.target.classList.contains('c-kind')) return;
+        calc.rows[+el.dataset.i].kind = e.target.value; calcRows();
+      });
+      $('calcRows').addEventListener('click', (e) => {
+        const el = e.target.closest('.ing'); if (!el || !e.target.classList.contains('x')) return;
+        calc.rows.splice(+el.dataset.i, 1); calcRows();
+      });
+      $('calcSH').addEventListener('input', (e) => { calc.sh = e.target.value === '' ? 100 : num(e.target.value); calcRefresh(); });
+      $('calcScale').addEventListener('click', () => {
+        const t = num($('calcTarget').value), total = calc.rows.reduce((s, r) => s + num(r.g), 0);
+        if (t <= 0 || total <= 0) return;
+        const f = t / total;
+        calc.rows.forEach((r) => { if (r.g !== '') r.g = r2(num(r.g) * f); });
+        calcRows();
+      });
+      $('calcUse').addEventListener('click', () => {
+        const flours = calc.rows.filter((r) => r.kind === 'flour' && num(r.g) > 0);
+        const F = sumK('flour'), starter = sumK('starter'), yeast = sumK('yeast');
+        const d = {
+          type: starter > 0 ? 'Sourdough' : 'Pizza',
+          flour: F ? String(r2(F)) : '', water: sumK('liquid') ? String(r2(sumK('liquid'))) : '',
+          salt: sumK('salt') ? String(r2(sumK('salt'))) : '',
+          leaven: (starter || yeast) ? String(r2(starter || yeast)) : '',
+          flourtype: flours.length > 1 ? flours.map((r) => `${r1(num(r.g) / F * 100)}% ${r.name}`).join(' / ') : (flours[0] ? flours[0].name : ''),
+          extras: calc.rows.filter((r) => r.kind === 'other' && num(r.g) > 0).map((r) => `${r.name || 'Other'} ${r2(num(r.g))}g`).join(', '),
+        };
+        $('calcDlg').close(); openEditor(d, true);
       });
 
       render();
